@@ -20,7 +20,6 @@ class _MeetlyAppState extends State<MeetlyApp> {
           themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
     });
   }
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
