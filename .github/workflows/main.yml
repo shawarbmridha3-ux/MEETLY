@@ -1,0 +1,40 @@
+name: Build MEETLY APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract MEETLY project
+        run: |
+          mkdir -p project
+          unzip -q MEETLY_COMPLETE_PROJECT.zip -d project
+          cd project
+          PROJECT_DIR=$(dirname "$(find . -name pubspec.yaml | head -1)")
+          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: stable
+
+      - name: Install dependencies
+        working-directory: project/${{ env.PROJECT_DIR }}
+        run: flutter pub get
+
+      - name: Build APK
+        working-directory: project/${{ env.PROJECT_DIR }}
+        run: flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MEETLY-APK
+          path: project/${{ env.PROJECT_DIR }}/build/app/outputs/flutter-apk/app-release.apkapk
