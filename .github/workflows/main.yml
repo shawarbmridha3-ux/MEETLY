@@ -17,7 +17,7 @@ class _MeetlyAppState extends State<MeetlyApp> {
   void toggleTheme() {
     setState(() {
       themeMode =
-          themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
+          themeMode == ThemeMode.dark : ThemeMode.light;
     });
   }
   @override
