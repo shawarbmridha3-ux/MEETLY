@@ -11,12 +11,28 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Verify project archive exists
+        run: |
+          if [ ! -f "MEETLY_COMPLETE_PROJECT.zip" ]; then
+            echo "❌ MEETLY_COMPLETE_PROJECT.zip not found"
+            exit 1
+          fi
+          echo "✓ Project archive found"
+
       - name: Extract MEETLY project
         run: |
           mkdir -p project
           unzip -q MEETLY_COMPLETE_PROJECT.zip -d project
-          cd project
-          PROJECT_DIR=$(dirname "$(find . -name pubspec.yaml | head -1)")
+          
+          # Find pubspec.yaml and verify it exists
+          PUBSPEC_PATH=$(find project -name pubspec.yaml -type f | head -1)
+          if [ -z "$PUBSPEC_PATH" ]; then
+            echo "❌ No pubspec.yaml found in extracted project"
+            exit 1
+          fi
+          
+          PROJECT_DIR=$(dirname "$PUBSPEC_PATH")
+          echo "✓ Found Flutter project at: $PROJECT_DIR"
           echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
 
       - name: Set up Flutter
@@ -24,17 +40,65 @@ jobs:
         with:
           flutter-version: '3.24.0'
           channel: stable
+          cache: true
+
+      - name: Verify Flutter installation
+        run: |
+          flutter --version
+          flutter doctor -v
 
       - name: Install dependencies
-        working-directory: project/${{ env.PROJECT_DIR }}
-        run: flutter pub get
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          echo "Installing dependencies in: ${{ env.PROJECT_DIR }}"
+          flutter pub get
+          if [ $? -ne 0 ]; then
+            echo "❌ Failed to install dependencies"
+            exit 1
+          fi
+          echo "✓ Dependencies installed successfully"
 
       - name: Build APK
-        working-directory: project/${{ env.PROJECT_DIR }}
-        run: flutter build apk --release
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          echo "Building APK in: ${{ env.PROJECT_DIR }}"
+          flutter build apk --release
+          if [ $? -ne 0 ]; then
+            echo "❌ APK build failed"
+            exit 1
+          fi
+          echo "✓ APK built successfully"
+
+      - name: Verify APK output
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
+          if [ ! -f "$APK_PATH" ]; then
+            echo "❌ APK not found at expected path: $APK_PATH"
+            ls -la build/app/outputs/ || true
+            exit 1
+          fi
+          APK_SIZE=$(du -h "$APK_PATH" | cut -f1)
+          echo "✓ APK verified (Size: $APK_SIZE)"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: MEETLY-APK
-          path: project/${{ env.PROJECT_DIR }}/build/app/outputs/flutter-apk/app-release.apkapk
+          path: ${{ env.PROJECT_DIR }}/build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Build summary
+        if: success()
+        run: |
+          echo "✓ Build completed successfully!"
+          echo "📦 APK: build/app/outputs/flutter-apk/app-release.apk"
+          echo "💾 Download from: Artifacts section"
+
+      - name: Failure summary
+        if: failure()
+        run: |
+          echo "❌ Build failed!"
+          echo "Check logs above for details"
+          exit 1
